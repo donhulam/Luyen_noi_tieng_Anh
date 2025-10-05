@@ -25,35 +25,11 @@
   margin-bottom: 10px;
 }
 
-.title-selector {
-  position: relative;
-  display: inline-block;
-}
-
-.title-selector select {
+.welcome-title {
   font-size: 28px;
   font-weight: bold;
   color: var(--gray-300);
-  background-color: transparent;
-  border: none;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  padding-right: 30px;
-  /* Space for the icon */
-  cursor: pointer;
   text-transform: capitalize;
-}
-
-.title-selector .icon {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
-  font-size: 30px;
-  color: var(--gray-300);
-  pointer-events: none;
-  /* Allows clicks to pass through to the select */
 }
 
 .welcome-content p {

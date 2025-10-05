@@ -68,6 +68,7 @@ function ControlTray({ children }: ControlTrayProps) {
     }
     return () => {
       audioRecorder.off('data', onData);
+      audioRecorder.stop();
     };
   }, [connected, client, muted, audioRecorder]);
 

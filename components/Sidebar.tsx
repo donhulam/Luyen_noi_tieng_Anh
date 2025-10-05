@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { FunctionCall, useSettings, useUI, useTools, Level } from '../lib/state';
+import { FunctionCall, useSettings, useUI, useTools, Level, communicationTopics, TopicId } from '../lib/state';
 import c from 'classnames';
 import { DEFAULT_LIVE_API_MODEL, AVAILABLE_VOICES } from '../lib/constants';
 import { useLiveAPIContext } from '../contexts/LiveAPIContext';
@@ -13,11 +13,20 @@ const AVAILABLE_MODELS = [
   DEFAULT_LIVE_API_MODEL
 ];
 
+const topicsByCategory = communicationTopics.reduce((acc, topic) => {
+  if (!acc[topic.category]) {
+    acc[topic.category] = [];
+  }
+  acc[topic.category].push(topic);
+  return acc;
+}, {} as Record<string, typeof communicationTopics>);
+
+
 export default function Sidebar() {
   const { isSidebarOpen, toggleSidebar } = useUI();
   const { systemPrompt, model, voice, level, setModel, setVoice, setLevel } =
     useSettings();
-  const { tools, toggleTool, addTool, removeTool, updateTool, isAddingTool } =
+  const { tools, toggleTool, addTool, removeTool, updateTool, isAddingTool, topic, setTopic } =
     useTools();
   const { connected } = useLiveAPIContext();
 
@@ -50,6 +59,18 @@ export default function Sidebar() {
                   rows={10}
                   placeholder="Mô tả vai trò và tính cách của AI..."
                 />
+              </label>
+              <label>
+                Chủ đề
+                <select value={topic} onChange={e => setTopic(e.target.value as TopicId)}>
+                  {Object.entries(topicsByCategory).map(([category, topics]) => (
+                    <optgroup label={category} key={category}>
+                      {topics.map(t => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
               </label>
               <label>
                 Cấp độ
