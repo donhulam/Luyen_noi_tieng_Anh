@@ -1,27 +1,13 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
-*/
-import { useUI } from '../lib/state';
 
-export default function Header() {
-  const { toggleSidebar } = useUI();
+import React from 'react';
 
+const Header: React.FC = () => {
   return (
-    <header>
-      <div className="header-left">
-        <h1>Huấn luyện viên giao tiếp tiếng Anh</h1>
-        <p>Thực hành giao tiếp tiếng Anh với gia sư AI.</p>
-      </div>
-      <div className="header-right">
-        <button
-          className="settings-button"
-          onClick={toggleSidebar}
-          aria-label="Cài đặt"
-        >
-          <span className="icon">tune</span>
-        </button>
-      </div>
+    <header className="bg-gray-800 p-4 text-center shadow-md">
+      <h1 className="text-3xl font-bold text-teal-400">Huấn luyện viên tiếng Anh</h1>
+      <p className="text-lg text-gray-400">Thực hành giao tiếp tiếng Anh với gia sư AI</p>
     </header>
   );
-}
+};
+
+export default Header;

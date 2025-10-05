@@ -1,6 +1,6 @@
 {
-  "name": "Huấn luyện viên giao tiếp tiếng Anh Ver 1.0",
-  "description": "Thực hành giao tiếp tiếng Anh và nhận phản hồi tức thì về phát âm và độ chính xác từ một huấn luyện viên AI.",
+  "name": "Huấn luyện viên tiếng Anh",
+  "description": "Thực hành giao tiếp tiếng Anh với gia sư AI để cải thiện kỹ năng nói và phát âm của bạn.",
   "requestFramePermissions": [
     "microphone"
   ]
