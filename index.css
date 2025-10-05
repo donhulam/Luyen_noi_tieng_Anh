@@ -1106,6 +1106,18 @@ form button:first-of-type {
   box-shadow: 0 0 0 2px var(--accent-blue-active-bg);
 }
 
+.sidebar-content textarea:read-only {
+  background-color: var(--Neutral-10);
+  cursor: default;
+  color: var(--gray-500);
+}
+
+.sidebar-content textarea:read-only:focus {
+  border-color: var(--gray-700);
+  box-shadow: none;
+}
+
+
 .sidebar-content select {
   width: 100%;
   appearance: none;

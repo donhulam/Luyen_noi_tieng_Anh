@@ -15,7 +15,7 @@ const AVAILABLE_MODELS = [
 
 export default function Sidebar() {
   const { isSidebarOpen, toggleSidebar } = useUI();
-  const { systemPrompt, model, voice, level, setSystemPrompt, setModel, setVoice, setLevel } =
+  const { systemPrompt, model, voice, level, setModel, setVoice, setLevel } =
     useSettings();
   const { tools, toggleTool, addTool, removeTool, updateTool, isAddingTool } =
     useTools();
@@ -46,7 +46,7 @@ export default function Sidebar() {
                 Chân dung Gia sư
                 <textarea
                   value={systemPrompt}
-                  onChange={e => setSystemPrompt(e.target.value)}
+                  readOnly
                   rows={10}
                   placeholder="Mô tả vai trò và tính cách của AI..."
                 />
