@@ -7,6 +7,7 @@ import SettingsPanel from './components/SettingsPanel';
 import ChatWindow from './components/ChatWindow';
 import Footer from './components/Footer';
 import Header from './components/Header';
+import AboutModal from './components/AboutModal';
 import { MenuIcon } from './components/Icons';
 
 // Helper functions for audio encoding/decoding
@@ -55,6 +56,7 @@ const App: React.FC = () => {
   ]);
   const [recordingState, setRecordingState] = useState<RecordingState>(RecordingState.IDLE);
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
 
   const sessionPromiseRef = useRef<Promise<LiveSession> | null>(null);
   const inputAudioContextRef = useRef<AudioContext | null>(null);
@@ -106,6 +108,37 @@ const App: React.FC = () => {
     sessionPromiseRef.current = null;
     setRecordingState(RecordingState.IDLE);
   }, []);
+
+  const resetApp = useCallback(() => {
+    stopRecording(); // Clean up any active session
+    
+    // Reset all states to their initial values
+    setSettings({
+      level: Object.keys(LEVELS)[0],
+      topic: TOPICS['CUỘC SỐNG HÀNG NGÀY'][0],
+      voice: VOICES[0],
+    });
+    setMessages([
+      { id: 'initial', text: 'Chào mừng bạn! Hãy chọn cài đặt và nhấn nút micro để bắt đầu.', sender: MessageSender.SYSTEM }
+    ]);
+    setIsSettingsOpen(true);
+    setIsAboutModalOpen(false);
+
+    // Reset refs holding session data
+    currentInputTranscriptionRef.current = '';
+    currentOutputTranscriptionRef.current = '';
+    nextStartTimeRef.current = 0;
+    
+    // Stop and clear any lingering audio sources
+    for (const source of audioSourcesRef.current.values()) {
+        try {
+            source.stop();
+        } catch (e) {
+            console.error("Error stopping audio source:", e);
+        }
+    }
+    audioSourcesRef.current.clear();
+  }, [stopRecording]);
 
   useEffect(() => {
     return () => {
@@ -192,6 +225,7 @@ const App: React.FC = () => {
   }, []);
 
   const startRecording = useCallback(async () => {
+    setIsSettingsOpen(false);
     setRecordingState(RecordingState.CONNECTING);
     setMessages([]);
 
@@ -255,7 +289,7 @@ const App: React.FC = () => {
   }, [settings.level, settings.topic, settings.voice, handleMessage, stopRecording]);
 
   const toggleRecording = () => {
-    if (recordingState === RecordingState.RECORDING) {
+    if (recordingState === RecordingState.RECORDING || recordingState === RecordingState.CONNECTING) {
         stopRecording();
     } else {
         startRecording();
@@ -278,7 +312,8 @@ const App: React.FC = () => {
     const dataInt16 = new Int16Array(data.buffer);
     const frameCount = dataInt16.length / numChannels;
     if (frameCount <= 0) {
-      return ctx.createBuffer(numChannels, 0, sampleRate);
+      // Return a silent buffer of minimal length to avoid createBuffer error
+      return ctx.createBuffer(numChannels, 1, sampleRate); 
     }
     const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
   
@@ -293,7 +328,7 @@ const App: React.FC = () => {
   
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-gray-100">
-      <Header />
+      <Header onShowAbout={() => setIsAboutModalOpen(true)} />
       <div className="flex flex-1 overflow-hidden relative">
         <SettingsPanel
           isOpen={isSettingsOpen}
@@ -315,7 +350,12 @@ const App: React.FC = () => {
           <ChatWindow messages={messages} />
         </main>
       </div>
-      <Footer onToggleRecording={toggleRecording} recordingState={recordingState} />
+      <Footer 
+        onToggleRecording={toggleRecording} 
+        recordingState={recordingState}
+        onResetApp={resetApp}
+      />
+      <AboutModal isOpen={isAboutModalOpen} onClose={() => setIsAboutModalOpen(false)} />
     </div>
   );
 };

@@ -1,13 +1,15 @@
+
 import React from 'react';
 import { RecordingState } from '../types';
-import { MicrophoneIcon, StopIcon } from './Icons';
+import { MicrophoneIcon, StopIcon, RefreshIcon } from './Icons';
 
 interface FooterProps {
   onToggleRecording: () => void;
   recordingState: RecordingState;
+  onResetApp: () => void;
 }
 
-const Footer: React.FC<FooterProps> = ({ onToggleRecording, recordingState }) => {
+const Footer: React.FC<FooterProps> = ({ onToggleRecording, recordingState, onResetApp }) => {
   const getButtonContent = () => {
     switch (recordingState) {
       case RecordingState.IDLE:
@@ -33,17 +35,31 @@ const Footer: React.FC<FooterProps> = ({ onToggleRecording, recordingState }) =>
   };
 
   const { icon, text, color } = getButtonContent();
+  
+  const isSessionActive = recordingState === RecordingState.CONNECTING || recordingState === RecordingState.RECORDING;
 
   return (
     <footer className="bg-gray-800 p-4 flex justify-center items-center">
-      <button
-        onClick={onToggleRecording}
-        disabled={recordingState === RecordingState.CONNECTING}
-        className={`flex items-center justify-center p-4 rounded-full text-white transition-all duration-300 transform hover:scale-105 shadow-lg ${color} disabled:opacity-75 disabled:cursor-wait`}
-      >
-        <span className="mr-2">{icon}</span>
-        <span className="font-medium">{text}</span>
-      </button>
+        <div className="flex items-center space-x-6">
+            <button
+                onClick={onResetApp}
+                className="flex items-center justify-center py-3 px-5 rounded-full text-white bg-gray-600 hover:bg-gray-500 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Tạo phiên mới"
+                disabled={isSessionActive}
+            >
+                <RefreshIcon />
+                <span className="font-medium ml-2">Tạo mới</span>
+            </button>
+
+            <button
+                onClick={onToggleRecording}
+                disabled={recordingState === RecordingState.CONNECTING}
+                className={`flex items-center justify-center py-3 px-5 rounded-full text-white transition-all duration-300 transform hover:scale-105 shadow-lg ${color} disabled:opacity-75 disabled:cursor-wait min-w-[180px]`}
+            >
+                <span className="mr-2">{icon}</span>
+                <span className="font-medium">{text}</span>
+            </button>
+        </div>
     </footer>
   );
 };
