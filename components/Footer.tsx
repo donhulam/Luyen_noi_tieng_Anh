@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { RecordingState } from '../types';
 import { MicrophoneIcon, StopIcon } from './Icons';
@@ -40,10 +39,10 @@ const Footer: React.FC<FooterProps> = ({ onToggleRecording, recordingState }) =>
       <button
         onClick={onToggleRecording}
         disabled={recordingState === RecordingState.CONNECTING}
-        className={`flex items-center justify-center p-5 rounded-full text-white transition-all duration-300 transform hover:scale-105 shadow-lg ${color} disabled:opacity-75 disabled:cursor-wait`}
+        className={`flex items-center justify-center p-4 rounded-full text-white transition-all duration-300 transform hover:scale-105 shadow-lg ${color} disabled:opacity-75 disabled:cursor-wait`}
       >
-        <span className="mr-3">{icon}</span>
-        <span className="font-medium text-xl">{text}</span>
+        <span className="mr-2">{icon}</span>
+        <span className="font-medium text-base">{text}</span>
       </button>
     </footer>
   );

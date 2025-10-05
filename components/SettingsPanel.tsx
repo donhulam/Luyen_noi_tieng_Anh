@@ -19,12 +19,12 @@ const Dropdown: React.FC<{
   disabled: boolean;
 }> = ({ label, value, onChange, options, disabled }) => (
   <div className="mb-4">
-    <label className="block text-lg font-medium text-gray-400 mb-1">{label}</label>
+    <label className="block text-base font-medium text-gray-400 mb-1">{label}</label>
     <select
       value={value}
       onChange={onChange}
       disabled={disabled}
-      className="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-lg text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-base text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {options}
     </select>
@@ -41,7 +41,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
       }`}
     >
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-teal-400">Cài đặt</h2>
+        <h2 className="text-xl font-bold text-teal-400">Cài đặt</h2>
         <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-700">
           <XIcon />
         </button>
@@ -49,8 +49,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
 
       <div className="flex-1 overflow-y-auto pr-2">
         <div className="mb-6 p-4 bg-gray-900 rounded-lg">
-          <h3 className="text-xl font-semibold text-teal-500 mb-2">Chân dung Gia sư</h3>
-          <p className="text-base text-gray-400 whitespace-pre-wrap h-60 overflow-y-auto pr-2">{tutorDescription}</p>
+          <h3 className="text-lg font-semibold text-teal-500 mb-2">Chân dung Gia sư</h3>
+          <p className="text-sm text-gray-400 whitespace-pre-wrap h-60 overflow-y-auto pr-2">{tutorDescription}</p>
         </div>
 
         <Dropdown

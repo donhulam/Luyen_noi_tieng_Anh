@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from 'react';
 import { Message, MessageSender } from '../types';
 
@@ -16,7 +15,7 @@ const ChatBubble: React.FC<{ message: Message }> = ({ message }) => {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
         <div className={`max-w-xl px-4 py-2 rounded-lg shadow-md ${bubbleClasses}`}>
-            <p className={`text-lg ${textClasses}`}>{message.text}</p>
+            <p className={`text-base ${textClasses}`}>{message.text}</p>
         </div>
     </div>
   );
@@ -25,7 +24,7 @@ const ChatBubble: React.FC<{ message: Message }> = ({ message }) => {
 const SystemMessage: React.FC<{ text: string }> = ({ text }) => {
     return (
         <div className="text-center my-4">
-            <p className="text-base text-gray-500 italic">{text}</p>
+            <p className="text-sm text-gray-500 italic">{text}</p>
         </div>
     );
 };
