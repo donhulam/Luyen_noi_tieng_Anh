@@ -1,47 +1,77 @@
 
-export const LEVELS = {
-  'Level 1 - Survival (A1-A2)': 'Người mới bắt đầu',
-  'Level 2 - Functional (B1)': 'Giao tiếp cơ bản',
-  'Level 3 - Professional (B2)': 'Giao tiếp công việc',
-  'Level 4 - Fluent (C1)': 'Thành thạo',
-  'Level 5 - Native-like (C2)': 'Như người bản xứ',
-};
+export const LEVELS: string[] = [
+    'Level 1 - Survival (A1-A2): Người mới bắt đầu',
+    'Level 2 - Functional (B1): Giao tiếp cơ bản',
+    'Level 3 - Professional (B2): Giao tiếp công việc',
+    'Level 4 - Fluent (C1): Thành thạo',
+    'Level 5 - Native-like (C2): Như người bản xứ'
+];
 
-export const TOPICS = {
-  'CUỘC SỐNG HÀNG NGÀY': [
-    'Giới thiệu & Làm quen', 'Gia đình & Mối quan hệ', 'Nhà ở & Sinh hoạt', 'Mua sắm', 'Ăn uống', 'Giao thông', 'Sức khỏe', 'Du lịch', 'Giải trí', 'Thời tiết & Môi trường',
-  ],
-  'HỌC TẬP & PHÁT TRIỂN': [
-    'Trường học & Giáo dục', 'Thi cử & Chứng chỉ', 'Học online & Công nghệ', 'Đọc sách & Nghiên cứu', 'Thuyết trình & Báo cáo', 'Thảo luận nhóm', 'Phỏng vấn học bổng', 'Viết luận văn & Paper',
-  ],
-  'CÔNG VIỆC & SỰ NGHIỆP': [
-    'Phỏng vấn xin việc', 'CV & Cover letter', 'Họp & Meeting', 'Email & Giao tiếp công việc', 'Thương lượng & Đàm phán', 'Quản lý & Lãnh đạo', 'Làm việc nhóm & Collaboration', 'Khách hàng & Dịch vụ', 'Báo cáo tiến độ', 'Đánh giá hiệu suất', 'Xin nghỉ phép & Xử lý vấn đề', 'Networking & Mối quan hệ nghề nghiệp',
-  ],
-  'CHUYÊN MÔN (Theo ngành)': [
-    'Công nghệ thông tin', 'Marketing & Sales', 'Tài chính & Kế toán', 'Y tế & Dược', 'Kỹ thuật & Xây dựng', 'Luật & Pháp lý', 'Nghệ thuật & Thiết kế', 'Khoa học & Nghiên cứu', 'Giáo dục & Đào tạo', 'Logistics & Vận tải',
-  ],
-  'XÃ HỘI & VĂN HÓA': [
-    'Tin tức & Thời sự', 'Chính trị & Kinh tế', 'Văn hóa & Lịch sử', 'Tranh luận & Phân tích', 'Xu hướng xã hội', 'Vấn đề môi trường', 'Công nghệ & Tương lai', 'Nghệ thuật & Văn học', 'Tôn giáo & Triết học', 'Small talk & Chit-chat',
-  ],
-  'TÌNH HUỐNG ĐẶC BIỆT': [
-    'Khẩn cấp', 'Khiếu nại & Giải quyết tranh chấp', 'Khen ngợi & Phê bình', 'Xin lỗi & Giải thích', 'Đồng cảm & An ủi', 'Đùa cợt & Hài hước', 'Tranh luận & Bảo vệ quan điểm', 'Thuyết phục & Ảnh hưởng', 'Tư vấn & Góp ý', 'Storytelling & Kể chuyện',
-  ],
-};
-
-export const VOICES = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir'];
-
-export const BASE_SYSTEM_INSTRUCTION = `You are Anna, a friendly and patient AI English tutor. Your student's native language is Vietnamese, and they are learning English.
-Your primary goal is to help the user practice translating Vietnamese sentences into spoken English.
-Your instructions are:
-1.  **Communicate primarily in English.** Use English for all feedback, instructions, and encouragement.
-2.  The **ONLY** time you will use Vietnamese is to provide the specific sentence for the user to translate.
-3.  Start the conversation by greeting the user and then giving them a Vietnamese sentence to translate, based on the specified topic and difficulty level.
-4.  The user will respond by speaking the English translation into their microphone.
-5.  Listen carefully to their spoken English response.
-6.  Use the 'provide_pronunciation_feedback' tool to analyze their pronunciation based on the user's spoken text.
-7.  Provide clear, concise feedback **in English** on both the **accuracy of the translation** and their **pronunciation**.
-8.  If the translation is wrong or pronunciation is off, gently correct them and explain the mistake simply in English. Be very encouraging.
-9.  Give only ONE Vietnamese phrase at a time. Wait for the user's attempt before providing the next one.
-10. Maintain a supportive, positive, and patient tone throughout the entire session.
-11. **Adhere strictly to the specified topic and difficulty level below for the Vietnamese sentences you provide.**
-`;
+export const TOPICS: string[] = [
+    'A. CUỘC SỐNG HÀNG NGÀY:',
+    '1. Giới thiệu & Làm quen',
+    '2. Gia đình & Mối quan hệ',
+    '3. Nhà ở & Sinh hoạt',
+    '4. Mua sắm (siêu thị, quần áo, điện tử)',
+    '5. Ăn uống (nhà hàng, cafe, nấu ăn)',
+    '6. Giao thông (hỏi đường, taxi, xe bus)',
+    '7. Sức khỏe (bệnh viện, khám bệnh, thuốc)',
+    '8. Du lịch (khách sạn, sân bay, tham quan)',
+    '9. Giải trí (phim, nhạc, thể thao, sở thích)',
+    '10. Thời tiết & Môi trường',
+    'B. HỌC TẬP & PHÁT TRIỂN:',
+    '11. Trường học & Giáo dục',
+    '12. Thi cử & Chứng chỉ',
+    '13. Học online & Công nghệ',
+    '14. Đọc sách & Nghiên cứu',
+    '15. Thuyết trình & Báo cáo',
+    '16. Thảo luận nhóm',
+    '17. Phỏng vấn học bổng',
+    '18. Viết luận văn & Paper',
+    'C. CÔNG VIỆC & SỰ NGHIỆP:',
+    '19. Phỏng vấn xin việc',
+    '20. CV & Cover letter (nói về)',
+    '21. Họp & Meeting (chủ trì, tham gia)',
+    '22. Email & Giao tiếp công việc',
+    '23. Thương lượng & Đàm phán',
+    '24. Quản lý & Lãnh đạo',
+    '25. Làm việc nhóm & Collaboration',
+    '26. Khách hàng & Dịch vụ',
+    '27. Báo cáo tiến độ',
+    '28. Đánh giá hiệu suất',
+    '29. Xin nghỉ phép & Xử lý vấn đề',
+    '30. Networking & Mối quan hệ nghề nghiệp',
+    'D. CHUYÊN MÔN (Theo ngành):',
+    '31. Công nghệ thông tin (code, debug, system)',
+    '32. Marketing & Sales',
+    '33. Tài chính & Kế toán',
+    '34. Y tế & Dược',
+    '35. Kỹ thuật & Xây dựng',
+    '36. Luật & Pháp lý',
+    '37. Nghệ thuật & Thiết kế',
+    '38. Khoa học & Nghiên cứu',
+    '39. Giáo dục & Đào tạo',
+    '40. Logistics & Vận tải',
+    'E. XÃ HỘI & VĂN HÓA:',
+    '41. Tin tức & Thời sự',
+    '42. Chính trị & Kinh tế',
+    '43. Văn hóa & Lịch sử',
+    '44. Tranh luận & Phân tích',
+    '45. Xu hướng xã hội',
+    '46. Vấn đề môi trường',
+    '47. Công nghệ & Tương lai',
+    '48. Nghệ thuật & Văn học',
+    '49. Tôn giáo & Triết học',
+    '50. Small talk & Chit-chat',
+    'F. TÌNH HUỐNG ĐẶC BIỆT:',
+    '51. Khẩn cấp (mất đồ, gặp nạn)',
+    '52. Khiếu nại & Giải quyết tranh chấp',
+    '53. Khen ngợi & Phê bình',
+    '54. Xin lỗi & Giải thích',
+    '55. Đồng cảm & An ủi',
+    '56. Đùa cợt & Hài hước',
+    '57. Tranh luận & Bảo vệ quan điểm',
+    '58. Thuyết phục & Ảnh hưởng',
+    '59. Tư vấn & Góp ý',
+    '60. Storytelling & Kể chuyện'
+];

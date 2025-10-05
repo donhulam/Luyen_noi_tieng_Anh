@@ -1,361 +1,290 @@
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Message } from './types';
+import { LEVELS, TOPICS } from './constants';
+import {
+  connectToLiveSession,
+  decode,
+  decodeAudioData,
+  createPcmBlob
+} from './services/geminiService';
+import { Settings, X, Menu, Mic, MicOff, Volume2 } from './components/icons';
+import { LiveSession, LiveServerMessage, ErrorEvent, CloseEvent } from '@google/genai';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { GoogleGenAI, LiveSession, LiveServerMessage, Modality, Type, FunctionDeclaration, Blob } from '@google/genai';
-import { Settings, Message, MessageSender, RecordingState } from './types';
-import { LEVELS, TOPICS, VOICES, BASE_SYSTEM_INSTRUCTION } from './constants';
-import SettingsPanel from './components/SettingsPanel';
-import ChatWindow from './components/ChatWindow';
-import Footer from './components/Footer';
-import Header from './components/Header';
-import AboutModal from './components/AboutModal';
-import { MenuIcon } from './components/Icons';
-
-// Helper functions for audio encoding/decoding
-function decode(base64: string): Uint8Array {
-  const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}
-
-function encode(bytes: Uint8Array): string {
-  let binary = '';
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-const providePronunciationFeedback: FunctionDeclaration = {
-  name: 'provide_pronunciation_feedback',
-  description: "Analyzes the user's spoken English pronunciation and provides feedback.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      user_spoken_text: {
-        type: Type.STRING,
-        description: "The English text spoken by the user, as transcribed by the system."
-      }
-    },
-    required: ['user_spoken_text']
-  }
-};
+const INPUT_SAMPLE_RATE = 16000;
+const OUTPUT_SAMPLE_RATE = 24000;
+const SCRIPT_PROCESSOR_BUFFER_SIZE = 4096;
 
 const App: React.FC = () => {
-  const [settings, setSettings] = useState<Settings>({
-    level: Object.keys(LEVELS)[0],
-    topic: TOPICS['CUỘC SỐNG HÀNG NGÀY'][0],
-    voice: VOICES[0],
-  });
-  const [messages, setMessages] = useState<Message[]>([
-    { id: 'initial', text: 'Chào mừng bạn! Hãy chọn cài đặt và nhấn nút micro để bắt đầu.', sender: MessageSender.SYSTEM }
-  ]);
-  const [recordingState, setRecordingState] = useState<RecordingState>(RecordingState.IDLE);
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
-  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+  const [level, setLevel] = useState<string>(LEVELS[0]);
+  const [topic, setTopic] = useState<string>('1. Giới thiệu & Làm quen');
+  
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('Click the microphone to start your session.');
+  
+  const currentUserTranscriptionRef = useRef('');
+  const currentTutorTranscriptionRef = useRef('');
+  const [displayUserTranscription, setDisplayUserTranscription] = useState('');
+  const [displayTutorTranscription, setDisplayTutorTranscription] = useState('');
 
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const sessionPromiseRef = useRef<Promise<LiveSession> | null>(null);
+  const sessionRef = useRef<LiveSession | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const mediaStreamSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const nextStartTimeRef = useRef(0);
+  const audioPlaybackSources = useRef(new Set<AudioBufferSourceNode>());
 
-  const nextStartTimeRef = useRef<number>(0);
-  const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
-  const currentInputTranscriptionRef = useRef('');
-  const currentOutputTranscriptionRef = useRef('');
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, displayUserTranscription, displayTutorTranscription]);
+  
+  const getSystemPrompt = useCallback(() => {
+    return `You are Anna, a friendly and patient AI English tutor. Your student's native language is Vietnamese, and they are learning English.
+Your primary goal is to help the user practice translating Vietnamese sentences into spoken English.
 
-  const stopRecording = useCallback(async () => {
-    if (sessionPromiseRef.current) {
-        try {
-            const session = await sessionPromiseRef.current;
-            session.close();
-        } catch (error) {
-            console.error('Error closing session:', error);
-        }
-    }
+Current Settings:
+- Level: ${level}
+- Topic: ${topic}
 
+Your instructions are:
+1. **Communicate primarily in English.** Use English for all feedback, instructions, and encouragement.
+2. The **ONLY** time you will use Vietnamese is to provide the specific sentence for the user to translate.
+3. Start the conversation by giving the user a Vietnamese sentence to translate, based on the specified topic and difficulty level.
+4. The user will respond by speaking the English translation into their microphone.
+5. Listen carefully to their spoken English response.
+6. Provide clear, concise feedback **in English** on both the **accuracy of the translation** and their **pronunciation**.
+7. If the translation is wrong or pronunciation is off, gently correct them and explain the mistake simply in English. Be very encouraging.
+8. Give only ONE Vietnamese phrase at a time. Wait for the user's attempt before providing the next one.
+9. Maintain a supportive, positive, and patient tone throughout the entire session.
+10. **Adhere strictly to the specified topic and difficulty level above for the Vietnamese sentences you provide.**`;
+  }, [level, topic]);
+
+  const stopSession = useCallback(() => {
     if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
-
     if (scriptProcessorRef.current) {
         scriptProcessorRef.current.disconnect();
         scriptProcessorRef.current = null;
     }
-
-    if(mediaStreamSourceRef.current) {
+    if (mediaStreamSourceRef.current) {
         mediaStreamSourceRef.current.disconnect();
         mediaStreamSourceRef.current = null;
     }
-
     if (inputAudioContextRef.current && inputAudioContextRef.current.state !== 'closed') {
-        await inputAudioContextRef.current.close();
+      inputAudioContextRef.current.close();
+      inputAudioContextRef.current = null;
     }
-    if (outputAudioContextRef.current && outputAudioContextRef.current.state !== 'closed') {
-       await outputAudioContextRef.current.close();
-    }
-
-    inputAudioContextRef.current = null;
-    outputAudioContextRef.current = null;
+    sessionPromiseRef.current?.then(session => session.close());
     sessionPromiseRef.current = null;
-    setRecordingState(RecordingState.IDLE);
-  }, []);
+    sessionRef.current = null;
 
-  const resetApp = useCallback(() => {
-    stopRecording(); // Clean up any active session
-    
-    // Reset all states to their initial values
-    setSettings({
-      level: Object.keys(LEVELS)[0],
-      topic: TOPICS['CUỘC SỐNG HÀNG NGÀY'][0],
-      voice: VOICES[0],
-    });
-    setMessages([
-      { id: 'initial', text: 'Chào mừng bạn! Hãy chọn cài đặt và nhấn nút micro để bắt đầu.', sender: MessageSender.SYSTEM }
-    ]);
-    setIsSettingsOpen(true);
-    setIsAboutModalOpen(false);
-
-    // Reset refs holding session data
-    currentInputTranscriptionRef.current = '';
-    currentOutputTranscriptionRef.current = '';
+    audioPlaybackSources.current.forEach(source => source.stop());
+    audioPlaybackSources.current.clear();
+    if (outputAudioContextRef.current && outputAudioContextRef.current.state !== 'closed') {
+        outputAudioContextRef.current.close();
+        outputAudioContextRef.current = null;
+    }
     nextStartTimeRef.current = 0;
     
-    // Stop and clear any lingering audio sources
-    for (const source of audioSourcesRef.current.values()) {
-        try {
-            source.stop();
-        } catch (e) {
-            console.error("Error stopping audio source:", e);
-        }
-    }
-    audioSourcesRef.current.clear();
-  }, [stopRecording]);
-
-  useEffect(() => {
-    return () => {
-        stopRecording();
-    };
-  }, [stopRecording]);
-
-  const handleMessage = useCallback(async (message: LiveServerMessage) => {
-    if (message.serverContent) {
-        const { inputTranscription, outputTranscription, turnComplete, modelTurn } = message.serverContent;
-        if(outputTranscription) {
-            currentOutputTranscriptionRef.current += outputTranscription.text;
-            setMessages(prev => {
-                const lastMessage = prev[prev.length - 1];
-                if (lastMessage && lastMessage.sender === MessageSender.AI) {
-                    const newMessages = [...prev];
-                    newMessages[newMessages.length - 1] = {...lastMessage, text: currentOutputTranscriptionRef.current};
-                    return newMessages;
-                } else {
-                    return [...prev, { id: `ai-${Date.now()}`, text: currentOutputTranscriptionRef.current, sender: MessageSender.AI }];
-                }
-            });
-        }
-        if (inputTranscription) {
-             currentInputTranscriptionRef.current += inputTranscription.text;
-             setMessages(prev => {
-                const lastMessage = prev[prev.length - 1];
-                if (lastMessage && lastMessage.sender === MessageSender.USER) {
-                    const newMessages = [...prev];
-                    newMessages[newMessages.length - 1] = {...lastMessage, text: currentInputTranscriptionRef.current};
-                    return newMessages;
-                } else {
-                     return [...prev, { id: `user-${Date.now()}`, text: currentInputTranscriptionRef.current, sender: MessageSender.USER }];
-                }
-            });
-        }
-        if (turnComplete) {
-            currentInputTranscriptionRef.current = '';
-            currentOutputTranscriptionRef.current = '';
-        }
-
-        const audioData = modelTurn?.parts[0]?.inlineData?.data;
-        if (audioData && outputAudioContextRef.current) {
-            const outputCtx = outputAudioContextRef.current;
-            const decodedBytes = decode(audioData);
-            
-            if (decodedBytes.length > 0) {
-                nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputCtx.currentTime);
-                const audioBuffer = await decodeAudioData(decodedBytes, outputCtx, 24000, 1);
-                
-                const source = outputCtx.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(outputCtx.destination);
-                source.addEventListener('ended', () => {
-                    audioSourcesRef.current.delete(source);
-                });
-                source.start(nextStartTimeRef.current);
-                nextStartTimeRef.current += audioBuffer.duration;
-                audioSourcesRef.current.add(source);
-            }
-        }
-
-        if (message.serverContent?.interrupted) {
-            for (const source of audioSourcesRef.current.values()) {
-                source.stop();
-                audioSourcesRef.current.delete(source);
-            }
-            nextStartTimeRef.current = 0;
-        }
-    }
-    if (message.toolCall && sessionPromiseRef.current) {
-        for (const fc of message.toolCall.functionCalls) {
-            sessionPromiseRef.current.then((session) => {
-                session.sendToolResponse({
-                    functionResponses: {
-                        id: fc.id,
-                        name: fc.name,
-                        response: { result: "Pronunciation analysis requested and processed." },
-                    }
-                });
-            });
-        }
-    }
+    setIsSessionActive(false);
+    setStatusMessage('Session ended. Click the microphone to practice again.');
   }, []);
 
-  const startRecording = useCallback(async () => {
-    setIsSettingsOpen(false);
-    setRecordingState(RecordingState.CONNECTING);
+  const handleNewSession = useCallback(async () => {
+    if (isSessionActive) {
+      stopSession();
+    }
     setMessages([]);
+    setDisplayUserTranscription('');
+    setDisplayTutorTranscription('');
+    currentUserTranscriptionRef.current = '';
+    currentTutorTranscriptionRef.current = '';
+    setStatusMessage('Connecting to tutor...');
 
     try {
-        const fullSystemInstruction = `${BASE_SYSTEM_INSTRUCTION}\n\nCURRENT SETTINGS:\n- Level: ${settings.level}\n- Topic: ${settings.topic}`;
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-        
-        inputAudioContextRef.current = new (window.AudioContext)({ sampleRate: 16000 });
-        outputAudioContextRef.current = new (window.AudioContext)({ sampleRate: 24000 });
-        streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: INPUT_SAMPLE_RATE });
+      outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: OUTPUT_SAMPLE_RATE });
 
-        sessionPromiseRef.current = ai.live.connect({
-            model: 'gemini-2.5-flash-native-audio-preview-09-2025',
-            callbacks: {
-                onopen: () => {
-                    if (!inputAudioContextRef.current || !streamRef.current) return;
-                    setRecordingState(RecordingState.RECORDING);
-                    mediaStreamSourceRef.current = inputAudioContextRef.current.createMediaStreamSource(streamRef.current);
-                    scriptProcessorRef.current = inputAudioContextRef.current.createScriptProcessor(4096, 1, 1);
-                    
-                    scriptProcessorRef.current.onaudioprocess = (event: AudioProcessingEvent) => {
-                        const inputData = event.inputBuffer.getChannelData(0);
-                        const pcmBlob = createBlob(inputData);
-                        if (sessionPromiseRef.current) {
-                            sessionPromiseRef.current.then((session) => {
-                                session.sendRealtimeInput({ media: pcmBlob });
-                            });
-                        }
-                    };
+      sessionPromiseRef.current = connectToLiveSession(getSystemPrompt(), {
+        onopen: async () => {
+            console.log('Session opened.');
+            setIsSessionActive(true);
+            setStatusMessage('Connected! Start speaking when you are ready.');
+            
+            try {
+                streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const source = inputAudioContextRef.current!.createMediaStreamSource(streamRef.current);
+                mediaStreamSourceRef.current = source;
+                const scriptProcessor = inputAudioContextRef.current!.createScriptProcessor(SCRIPT_PROCESSOR_BUFFER_SIZE, 1, 1);
+                scriptProcessorRef.current = scriptProcessor;
 
-                    mediaStreamSourceRef.current.connect(scriptProcessorRef.current);
-                    scriptProcessorRef.current.connect(inputAudioContextRef.current.destination);
-                },
-                onmessage: handleMessage,
-                onerror: (e: ErrorEvent) => {
-                    console.error('Session error:', e);
-                    setMessages(prev => [...prev, { id: 'error', text: 'Đã xảy ra lỗi. Vui lòng thử lại.', sender: MessageSender.SYSTEM }]);
-                    setRecordingState(RecordingState.ERROR);
-                    stopRecording();
-                },
-                onclose: (e: CloseEvent) => {
-                    console.log('Session closed');
-                    stopRecording();
-                },
-            },
-            config: {
-                responseModalities: [Modality.AUDIO],
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: settings.voice } } },
-                systemInstruction: fullSystemInstruction,
-                inputAudioTranscription: {},
-                outputAudioTranscription: {},
-                tools: [{ functionDeclarations: [providePronunciationFeedback] }],
-            },
-        });
+                scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
+                    const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
+                    const pcmBlob = createPcmBlob(inputData);
+                    sessionPromiseRef.current?.then((session) => {
+                        session.sendRealtimeInput({ media: pcmBlob });
+                    });
+                };
+                source.connect(scriptProcessor);
+                scriptProcessor.connect(inputAudioContextRef.current!.destination);
+            } catch (err) {
+                console.error('Microphone access denied:', err);
+                setStatusMessage('Microphone access denied. Please allow permission.');
+                stopSession();
+            }
+        },
+        onmessage: async (message: LiveServerMessage) => {
+            if (message.serverContent?.inputTranscription) {
+                currentUserTranscriptionRef.current += message.serverContent.inputTranscription.text;
+                setDisplayUserTranscription(currentUserTranscriptionRef.current);
+            }
+            if (message.serverContent?.outputTranscription) {
+                currentTutorTranscriptionRef.current += message.serverContent.outputTranscription.text;
+                setDisplayTutorTranscription(currentTutorTranscriptionRef.current);
+            }
+            if (message.serverContent?.turnComplete) {
+                const userText = currentUserTranscriptionRef.current.trim();
+                const tutorText = currentTutorTranscriptionRef.current.trim();
+                const newMessages: Message[] = [];
+                if (userText) newMessages.push({ role: 'user', content: userText });
+                if (tutorText) newMessages.push({ role: 'ai', content: tutorText });
+                if (newMessages.length > 0) setMessages(prev => [...prev, ...newMessages]);
+                
+                currentUserTranscriptionRef.current = '';
+                currentTutorTranscriptionRef.current = '';
+                setDisplayUserTranscription('');
+                setDisplayTutorTranscription('');
+            }
 
+            const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData.data;
+            if (base64Audio) {
+                const audioContext = outputAudioContextRef.current!;
+                nextStartTimeRef.current = Math.max(nextStartTimeRef.current, audioContext.currentTime);
+
+                const audioBuffer = await decodeAudioData(decode(base64Audio), audioContext, OUTPUT_SAMPLE_RATE, 1);
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContext.destination);
+                source.onended = () => audioPlaybackSources.current.delete(source);
+                source.start(nextStartTimeRef.current);
+                nextStartTimeRef.current += audioBuffer.duration;
+                audioPlaybackSources.current.add(source);
+            }
+            
+            if (message.serverContent?.interrupted) {
+                audioPlaybackSources.current.forEach(source => source.stop());
+                audioPlaybackSources.current.clear();
+                nextStartTimeRef.current = 0;
+            }
+        },
+        onerror: (e: ErrorEvent) => {
+          console.error('Session error:', e);
+          setStatusMessage('A connection error occurred. Please restart.');
+          stopSession();
+        },
+        onclose: (e: CloseEvent) => {
+          console.log('Session closed.');
+          stopSession();
+        },
+      });
+
+      sessionRef.current = await sessionPromiseRef.current;
     } catch (error) {
-        console.error('Failed to start recording:', error);
-        setMessages(prev => [...prev, { id: 'error-mic', text: 'Không thể truy cập micro. Vui lòng cấp quyền và thử lại.', sender: MessageSender.SYSTEM }]);
-        setRecordingState(RecordingState.ERROR);
+      console.error('Failed to start session:', error);
+      setStatusMessage('Failed to start session. Please check your connection.');
+      setIsSessionActive(false);
     }
-  }, [settings.level, settings.topic, settings.voice, handleMessage, stopRecording]);
-
-  const toggleRecording = () => {
-    if (recordingState === RecordingState.RECORDING || recordingState === RecordingState.CONNECTING) {
-        stopRecording();
+  }, [isSessionActive, getSystemPrompt, stopSession]);
+  
+  useEffect(() => {
+    return () => { stopSession(); };
+  }, [stopSession]);
+  
+  const handleMicButtonClick = () => {
+    if (isSessionActive) {
+      stopSession();
     } else {
-        startRecording();
+      handleNewSession();
     }
   };
 
-  function createBlob(data: Float32Array): Blob {
-    const l = data.length;
-    const int16 = new Int16Array(l);
-    for (let i = 0; i < l; i++) {
-      int16[i] = data[i] * 32768;
-    }
-    return {
-      data: encode(new Uint8Array(int16.buffer)),
-      mimeType: 'audio/pcm;rate=16000',
-    };
-  }
-
-  async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
-    const dataInt16 = new Int16Array(data.buffer);
-    const frameCount = dataInt16.length / numChannels;
-    if (frameCount <= 0) {
-      // Return a silent buffer of minimal length to avoid createBuffer error
-      return ctx.createBuffer(numChannels, 1, sampleRate); 
-    }
-    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-  
-    for (let channel = 0; channel < numChannels; channel++) {
-      const channelData = buffer.getChannelData(channel);
-      for (let i = 0; i < frameCount; i++) {
-        channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-      }
-    }
-    return buffer;
-  }
-  
   return (
-    <div className="flex flex-col h-screen bg-gray-900 text-gray-100">
-      <Header onShowAbout={() => setIsAboutModalOpen(true)} />
-      <div className="flex flex-1 overflow-hidden relative">
-        <SettingsPanel
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-          settings={settings}
-          onSettingsChange={setSettings}
-          isRecording={recordingState === RecordingState.RECORDING}
-        />
-        <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isSettingsOpen ? 'hidden md:flex md:ml-1/4' : 'flex'}`}>
-           {!isSettingsOpen && (
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="absolute top-4 left-4 z-20 p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition-colors"
-              aria-label="Mở cài đặt"
-            >
-              <MenuIcon />
-            </button>
-          )}
-          <ChatWindow messages={messages} />
-        </main>
+    <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 to-indigo-100 font-sans">
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 shadow-lg">
+        <h1 className="text-3xl font-bold">English Speaking Coach</h1>
+        <p className="text-indigo-100 mt-1">Practice your English conversation skills with an AI Tutor</p>
       </div>
-      <Footer 
-        onToggleRecording={toggleRecording} 
-        recordingState={recordingState}
-        onResetApp={resetApp}
-      />
-      <AboutModal isOpen={isAboutModalOpen} onClose={() => setIsAboutModalOpen(false)} />
+
+      <div className="flex flex-1 overflow-hidden">
+        {isSettingsOpen && (
+          <div className="w-80 bg-white shadow-xl p-6 overflow-y-auto relative border-r border-gray-200 transition-all duration-300">
+            <button onClick={() => setIsSettingsOpen(false)} className="absolute top-4 right-4 p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 rounded-lg transition"><X size={20} /></button>
+            <h2 className="text-xl font-bold mb-6 text-indigo-700 flex items-center gap-2"><Settings size={22} />Settings</h2>
+            <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-indigo-200">
+              <h3 className="font-semibold mb-2 text-indigo-800">👋 Meet Your Tutor, Anna!</h3>
+              <p className="text-sm text-gray-700 leading-relaxed">I'll provide sentences in Vietnamese for you to translate and speak in English. I'll then give you feedback on your translation and pronunciation. Let's get started!</p>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-semibold mb-2 text-gray-700">Level</label>
+              <select value={level} onChange={(e) => setLevel(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                {LEVELS.map((l) => (<option key={l} value={l}>{l}</option>))}
+              </select>
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm font-semibold mb-2 text-gray-700">Topic</label>
+              <select value={topic} onChange={(e) => setTopic(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                {TOPICS.map((t) => (<option key={t} value={t} disabled={t.includes(':')}>{t}</option>))}
+              </select>
+            </div>
+            <button onClick={handleNewSession} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 transition shadow-md disabled:opacity-70" disabled={isSessionActive}>
+              🔄 Start New Session
+            </button>
+          </div>
+        )}
+
+        <div className="flex-1 flex flex-col bg-white/50">
+          {!isSettingsOpen && (<button onClick={() => setIsSettingsOpen(true)} className="absolute top-24 left-4 p-3 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 transition z-10"><Menu size={20} /></button>)}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {messages.length === 0 && !isSessionActive && (
+              <div className="text-center text-gray-500 mt-20 flex flex-col items-center">
+                <Volume2 size={48} className="mx-auto mb-4 text-indigo-400" />
+                <p className="text-lg">Your session is ready.</p><p>Press the microphone button to begin your voice conversation.</p>
+              </div>
+            )}
+            {messages.map((msg, idx) => (
+              <div key={idx} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {msg.role === 'ai' && <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex-shrink-0 text-white font-bold text-sm flex items-center justify-center">A</div>}
+                <div className={`max-w-[80%] p-4 rounded-2xl ${msg.role === 'user' ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-br-none' : 'bg-gray-100 text-gray-800 border border-gray-200 rounded-bl-none'}`}>
+                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                </div>
+              </div>
+            ))}
+            {displayUserTranscription && (<div className="flex items-end gap-2 justify-end"><div className="max-w-[80%] p-4 rounded-2xl bg-indigo-200 text-indigo-900 rounded-br-none opacity-70"><p className="whitespace-pre-wrap leading-relaxed">{displayUserTranscription}</p></div></div>)}
+            {displayTutorTranscription && (<div className="flex items-end gap-2 justify-start"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex-shrink-0 text-white font-bold text-sm flex items-center justify-center">A</div><div className="max-w-[80%] p-4 rounded-2xl bg-gray-50 text-gray-700 border border-gray-200 rounded-bl-none opacity-70"><p className="whitespace-pre-wrap leading-relaxed">{displayTutorTranscription}</p></div></div>)}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="p-6 bg-white/80 backdrop-blur-sm border-t border-gray-200">
+            <div className="flex justify-center">
+              <button onClick={handleMicButtonClick} className={`p-6 rounded-full shadow-2xl transition-all transform hover:scale-110 ${isSessionActive ? 'bg-red-500 hover:bg-red-600 animate-pulse' : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'}`}>
+                {isSessionActive ? <MicOff size={32} className="text-white" /> : <Mic size={32} className="text-white" />}
+              </button>
+            </div>
+            <p className="text-center mt-3 text-sm text-gray-600 h-5">{statusMessage}</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,7 +1,6 @@
-
 {
-  "name": "HUẤN LUYỆN VIÊN TẬP NÓI TIẾNG ANH",
-  "description": "Thực hành giao tiếp tiếng Anh với gia sư AI để cải thiện kỹ năng nói và phát âm của bạn.",
+  "name": "AI English Tutor",
+  "description": "An interactive web application that helps users practice their English speaking and translation skills with an AI-powered tutor.",
   "requestFramePermissions": [
     "microphone"
   ]
