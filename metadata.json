@@ -1,0 +1,7 @@
+{
+  "name": "Huấn luyện viên tiếng Anh",
+  "description": "Thực hành giao tiếp tiếng Anh với gia sư AI để cải thiện kỹ năng nói và phát âm của bạn.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
