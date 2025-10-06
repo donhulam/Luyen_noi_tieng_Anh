@@ -7,7 +7,7 @@ import {
   decodeAudioData,
   createPcmBlob
 } from './services/geminiService';
-import { Settings, X, Menu, Mic, MicOff, Volume2 } from './components/icons';
+import { Settings, X, Menu, Mic, MicOff, Volume2, HelpCircle } from './components/icons';
 import { LiveSession, LiveServerMessage, ErrorEvent, CloseEvent } from '@google/genai';
 
 const INPUT_SAMPLE_RATE = 16000;
@@ -16,6 +16,7 @@ const SCRIPT_PROCESSOR_BUFFER_SIZE = 4096;
 
 const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [level, setLevel] = useState<string>(LEVELS[0]);
   const [topic, setTopic] = useState<string>('1. Giới thiệu & Làm quen');
   
@@ -167,19 +168,24 @@ Your instructions are:
                 setDisplayTutorTranscription('');
             }
 
-            const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData.data;
-            if (base64Audio) {
-                const audioContext = outputAudioContextRef.current!;
-                nextStartTimeRef.current = Math.max(nextStartTimeRef.current, audioContext.currentTime);
-
-                const audioBuffer = await decodeAudioData(decode(base64Audio), audioContext, OUTPUT_SAMPLE_RATE, 1);
-                const source = audioContext.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(audioContext.destination);
-                source.onended = () => audioPlaybackSources.current.delete(source);
-                source.start(nextStartTimeRef.current);
-                nextStartTimeRef.current += audioBuffer.duration;
-                audioPlaybackSources.current.add(source);
+            const parts = message.serverContent?.modelTurn?.parts;
+            if (parts) {
+                for (const part of parts) {
+                    const base64Audio = part.inlineData?.data;
+                    if (base64Audio) {
+                        const audioContext = outputAudioContextRef.current!;
+                        nextStartTimeRef.current = Math.max(nextStartTimeRef.current, audioContext.currentTime);
+        
+                        const audioBuffer = await decodeAudioData(decode(base64Audio), audioContext, OUTPUT_SAMPLE_RATE, 1);
+                        const source = audioContext.createBufferSource();
+                        source.buffer = audioBuffer;
+                        source.connect(audioContext.destination);
+                        source.onended = () => audioPlaybackSources.current.delete(source);
+                        source.start(nextStartTimeRef.current);
+                        nextStartTimeRef.current += audioBuffer.duration;
+                        audioPlaybackSources.current.add(source);
+                    }
+                }
             }
             
             if (message.serverContent?.interrupted) {
@@ -221,10 +227,54 @@ Your instructions are:
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 to-indigo-100 font-sans">
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 shadow-lg">
-        <h1 className="text-3xl font-bold">English Speaking Coach</h1>
-        <p className="text-indigo-100 mt-1">Practice your English conversation skills with an AI Tutor</p>
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 shadow-lg flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">English Speaking Coach</h1>
+          <p className="text-indigo-100 mt-1">Practice your English conversation skills with an AI Tutor</p>
+        </div>
+        <button onClick={() => setIsHelpModalOpen(true)} className="flex items-center gap-2 text-white bg-white/20 hover:bg-white/30 font-medium py-2 px-4 rounded-lg transition-colors">
+          <HelpCircle size={20} />
+          <span>Help & Introduction</span>
+        </button>
       </div>
+      
+      {isHelpModalOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 transition-opacity" onClick={() => setIsHelpModalOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full m-4 relative transition-transform transform scale-95" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setIsHelpModalOpen(false)} className="absolute top-4 right-4 p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 rounded-full transition"><X size={20} /></button>
+            <h2 className="text-2xl font-bold text-indigo-700 mb-4">How to Use Your AI English Tutor</h2>
+            <p className="text-gray-600 mb-6">Welcome to your personal English Speaking Coach! Here's a quick guide to get started:</p>
+            <ol className="space-y-4 text-gray-700">
+              <li className="flex items-start gap-3">
+                <div className="w-6 h-6 bg-indigo-100 text-indigo-600 font-bold rounded-full flex items-center justify-center flex-shrink-0">1</div>
+                <div><span className="font-semibold">Configure Your Session:</span> Use the <span className="font-semibold text-indigo-600">Settings</span> panel on the left to choose your proficiency <span className="font-semibold">Level</span> and a <span className="font-semibold">Topic</span> to practice. Click <span className="italic">"Start New Session"</span> when you're ready.</div>
+              </li>
+               <li className="flex items-start gap-3">
+                <div className="w-6 h-6 bg-indigo-100 text-indigo-600 font-bold rounded-full flex items-center justify-center flex-shrink-0">2</div>
+                <div><span className="font-semibold">Start Speaking:</span> Click the large <span className="font-semibold text-indigo-600">microphone button</span> at the bottom. Your AI tutor, Anna, will greet you and give you a sentence in Vietnamese to translate.</div>
+              </li>
+              <li className="flex items-start gap-3">
+                <div className="w-6 h-6 bg-indigo-100 text-indigo-600 font-bold rounded-full flex items-center justify-center flex-shrink-0">3</div>
+                <div><span className="font-semibold">Translate & Speak:</span> Speak the English translation clearly into your microphone. You'll see a live transcription of what you're saying.</div>
+              </li>
+              <li className="flex items-start gap-3">
+                <div className="w-6 h-6 bg-indigo-100 text-indigo-600 font-bold rounded-full flex items-center justify-center flex-shrink-0">4</div>
+                <div><span className="font-semibold">Receive Feedback:</span> Anna will provide instant feedback on your translation accuracy and pronunciation, all in English.</div>
+              </li>
+              <li className="flex items-start gap-3">
+                <div className="w-6 h-6 bg-indigo-100 text-indigo-600 font-bold rounded-full flex items-center justify-center flex-shrink-0">5</div>
+                <div><span className="font-semibold">End the Session:</span> Click the red microphone button at any time to finish.</div>
+              </li>
+            </ol>
+             <p className="text-center text-sm text-gray-500 mt-8">
+              Tạo bởi: Đỗ Như Lâm - Zalo: 0911 855 646
+            </p>
+             <button onClick={() => setIsHelpModalOpen(false)} className="mt-4 w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 transition shadow-md">
+              Got it, let's practice!
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {isSettingsOpen && (
